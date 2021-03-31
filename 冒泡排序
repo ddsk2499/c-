@@ -1,0 +1,30 @@
+//冒泡排序
+//2021.3.24
+#include<stdio.h>//头文件
+#define N 100//定义函数长度
+int main()
+{
+	int a[N], i,j, temp;//定义数组，循环数，中间存储
+	int n;//定义数组大小
+	scanf_s("%d", &n);//得到数组大小
+	for (i = 0; i < n; i++)//用循环得到数组
+		scanf_s("%d", &a[i]);
+
+
+	for(i=1;i<n;i++)//主循环（全部遍历）
+		for(j=0;j<n-i;j++)//次循环（遍历一遍）
+			if (a[j] > a[j + 1])
+			{
+				temp = a[j];
+				a[j] = a[j + 1];
+				a[j + 1] = temp;
+			}//满足条件则交换前后
+	//将数组从小到大排序
+
+	
+	for (i = 0; i < n; i++)//输出数组
+		printf("%d ", a[i]);
+	
+	
+	return 0;
+}
