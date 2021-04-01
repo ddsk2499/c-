@@ -1,0 +1,42 @@
+/*快速排序：
+1.从数列中挑出一个元素，称为“基准”
+2.分区: 遍历数列，比基准小的元素放左边，比它大的放右边。于是此次分区结束后，该基准就处于数列的中间位置，其左边的数全比它小（称为小与子序列），右边的数全比他大（称为大于子序列）。这样一次排序就造成了整体上的有序化。
+3.子数列排序 : 将小于子数列和大于子序列分别继续快速排序。
+4.递归到最底部时，数列的大小是零或一，至此就都排序好了，递归结束。
+*/
+#include<stdio.h>
+int arr[] = { 7,5,9,8,1,2,8,6 };
+int getpivot(int left, int right) 
+{   //每个循环的条件都是left<right 
+	int pivot = arr[left];//把最左侧的值赋给支点
+	while (left < right)
+	{
+		while (arr[right] >= pivot && left < right)//当right所处位置的值小于pivot时停止right的移动，将该位置的值赋给left
+		right--;
+		arr[left] = arr[right];
+
+
+		while (arr[left] < pivot&&left < right)//当left所处位置的值大于等于pivot时停止left的移动，并将其赋给right
+		left++;
+		arr[right] = arr[left];
+	}
+	arr[right] = pivot;// 这里left==right 所以都可以 下同 
+	return left;//这里left==right，所以都可以，下同
+}
+void quicksort(int left, int right)
+{
+	if (left < right) {
+		int pivot = getpivot(left, right);//调用getpivot函数来找中间位置左右分割
+		quicksort(left, pivot - 1);//处理左边，这里是一个递归的过程
+		quicksort(pivot + 1, right);//处理右边 ，这里是一个递归的过程
+	}
+}
+
+int main(void)//主函数
+{
+	int i;
+	quicksort(0, 7);//调用quicksort函数，取数组第一位为left，最后一位为right
+	for (i = 0; i < 8; i++)
+		printf("%d ", arr[i]);//输出排序后的数组
+	return 0;
+}
