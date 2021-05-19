@@ -1,0 +1,24 @@
+//在一个字串s1中查找一子串s2，若存在则返回s1中s2的个数和位置
+//2021.5.19
+//通过循环判断s2位置
+#include<stdio.h>//调用printf函数
+#include<string.h>//调用gets函数
+void main()//主函数
+{
+	char s1[100], s2[10];//定义s1，s2长度
+	int i, j, k, len1, len2, b[10];
+	gets_s(s1);//通过输入得到s1
+	gets_s(s2);//通过输入得到s2
+	len1 = strlen(s1);//获得s1的长度
+	len2 = strlen(s2);//获得s2的长度
+	for (i = 0, k = 0; i < len1; i++)//外循环
+	{
+		for (j = 0; j < len2; j++)//内循环
+			if (s1[i + j] != s2[j]) break;//判断是否s1，s2相同
+		if (j >= len2)
+			b[k++] = i + 1; //i从0开始计数的，所以位置是i+1//
+	}
+	for (i = 0; i < k; i++)//通过循环返回s2在s1中的位置,可能有多个
+		printf("%d ", b[i]);
+	printf("\n");
+}
