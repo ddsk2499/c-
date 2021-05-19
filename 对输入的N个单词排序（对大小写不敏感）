@@ -1,0 +1,56 @@
+//对输入的N个单词排序（对大小写不敏感）
+//2021.5.19
+//得到一组单词后，用查插入排序进行排序，并且用strimcp函数进行比较可以对大小写不敏感，定义了插入排序函数wordsort，输出函数print
+#include<string.h>//调用strcpy，stricmp函数
+#include<stdio.h>//调用printf，scanf函数
+#define N 50//单词数上限
+#define M 26//单词长度上限
+//插入排序
+void wordsort(char word[][M], int n)//定义插入排序函数wordsort
+{
+	char key[M];
+	int i, j;//定义循环用数
+	for (i = 1; i < n; i++)//外循环（全部遍历）；i初始值为1是为了使key不为第一位，若key为第一个没有意义
+	{
+		strcpy_s(key, word[i]);//将word[i]复制为key
+		j = i;
+		while (j >= 1 && _stricmp(word[j - 1], key) > 0)//内循环（将无序数组中最小的数插入到前面有序数组中）；syricmp函数可以对大小写不敏感的比较
+		{
+			strcpy_s( word[j],word[j - 1] );//将后一位复制到前一位
+			j--;
+		}
+		strcpy_s(word[j], key);//归还值
+	}
+}
+
+void print(const char word[][M], int n)//定义输出函数
+{
+	int i;
+	for (i = 0; i < n; i++)//将排序后的单词按顺序输出打印
+	{
+		printf("%s\n", word[i]);//打印word[i]
+	}
+}
+//打印数组
+void main()//主函数
+{
+	char word[N][M];
+	int m = M - 1;//单词长度
+	int count = N;
+	int n = 0, i;
+	//控制输入的单词数在1-50
+	while (n < 1 || n>50)
+	{
+		printf("请输入单词：(1-%d)\n", count);//限制单词在（1-50）
+		scanf_s("%d", &n);
+	}
+	printf("请输入%d个单词，以空格分开\n(单词长度不超过%d,若超出，程序会自动忽略超出部分)\n", n, m);
+	for (i = 0; i < n; i++)//用循环输入对应一系列单词
+	{
+		scanf_s("%s",&word[i],50);
+		word[i][M - 1] = '\0';//用于分开单词
+	}
+	wordsort(word, n);//调用wordsort函数
+	print(word, n);//调用print函数
+	printf("程序结束，若要对更多或者更长的单词排序，请修改N，M的值\n");
+}//程序结束
