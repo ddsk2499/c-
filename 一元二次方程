@@ -1,0 +1,38 @@
+//一元二次方程
+//2021.5.19
+//改至https://blog.csdn.net/WRNGT/article/details/53177002?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522162140300416780269886088%2522%252C%2522scm%2522%253A%252220140713.130102334.pc%255Fall.%2522%257D&request_id=162140300416780269886088&b
+//方程形式：ax2+bx+c=0，当b^2-4ac=0,方程有两个相等的实根，x1=x2=-b/2a；当b ^ 2 - 4ac > 0, 方程有两个不相等的实根, x1 = (-b + √(b ^ 2 - 4ac)) / (2a), x2 = (-b - √(b ^ 2 - 4ac)) / (2a)；当b ^ 2 - 4ac < 0，方程有一组共轭复根；
+#include <stdio.h>//调用printf，scanf函数
+#include <math.h>//调用sqrt函数
+#define EXP 0.00000001//近似0
+int main()//主函数
+{
+	double a = 0.0;//确定精度
+	double b = 0.0;
+	double c = 0.0;
+	scanf_s("%lf%lf%lf", &a, &b, &c);//得到a,b,c的值
+	if ((a >= -EXP) && (a <= EXP))//判断a是否为0
+	{
+		printf("不是一元二次方程\n");//a为0则不若一元二次方程
+	}
+	else//确定为一元二次方程后分情况讨论
+	{
+		double disc = b * b - 4 * a*c;//定义▲
+
+		if ((disc >= -EXP) && (disc <= EXP))//▲=0时
+		{
+			printf("x = %lf\n", -b / (2 * a));//x1=x2=-b/2a
+		}
+		else if (disc > 0.0)//▲>0时
+		{
+			printf("x1 = x2 %lf, x2 = %lf\n",(-b + sqrt(disc)) / (2 * a),(-b - sqrt(disc)) / (2 * a));
+			//x1 = (-b + √(b ^ 2 - 4ac)) / (2a), x2 = (-b - √(b ^ 2 - 4ac)) / (2a)
+		}
+		else//▲<0
+		{
+			printf("有两个共轭的复根\n");//有两个共轭的复根
+		}
+	}
+
+	return 0;
+}//程序结束
