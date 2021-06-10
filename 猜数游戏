@@ -1,0 +1,24 @@
+//猜数游戏
+#include<stdio.h>//调用printf函数及scanf函数
+#include<time.h>//调用time函数
+#include<stdlib.h>//srand函数和rand函数
+#include<conio.h>//调用getch函数
+int main()
+{
+	int num, guess, count = 0;
+	srand((int)time(NULL));//设置随机数种子
+	num = rand() % 10 + 1;//rand()%100生成0—9的随机数
+	while (count != 3)//如果小于三次则再循环
+	{
+		count++;//计数增加
+		printf("请输入您猜测的数字(在1到10之间）:");
+		scanf_s("%d", &guess);//得到数字
+		if (num > guess)
+			printf("您输入的数字小了\n");
+		else if (num < guess)
+			printf("您输入的数字大了\n");
+		else if (num == guess)
+			printf("恭喜您，猜对了，答案为%d\n", guess);
+	}
+	printf("很可惜，猜数机会用完了，您没猜对！\n");
+}
