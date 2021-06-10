@@ -1,0 +1,715 @@
+//项目名称：简易五子棋
+//2021.6.6
+//刘子豪
+//项目功能需求：1.能够自由选择玩家先手还是电脑先手或是电脑对战（默认玩家为黑棋，电脑为白棋），并且可查询对局记录。2.电脑能够自动进行落子。3.对战结果存储在文件中。
+//项目说明：1.使用二维数组进行棋局。2.使用双缓冲区，防止屏闪。3.通过落子位置评分算法使电脑能够自行判断落子。4.使用文件保存对局数据。(需要在D盘创建a+.txt,b.txt,w.txt,1.txt文件)
+
+/*双缓冲区：不断的重复”擦除->显示”控制台打印的内容，显示的内容由时间和用户的输入做出相应的变化。
+控制台的擦除会用到如下语句:system("cls")此语句会导致闪屏。
+原因是控制台从键盘或者程序命令中获得要输出的数据，然后输出到显示缓冲区进行输出。
+在这个流程之中，假设程序要打一万个*，则第一个*的输出时间和第一万个*的输出时间是有差别的。
+而假设我们要程序去显示15*15的*，显示完后马上擦除，再来一次，则显示缓冲区不满15*15的　*　的状态会居多，因此就造成了闪烁。
+解决方法就是使用双缓冲技术：
+1.将要输出的数据写在缓冲区一（写的过程中显示的是缓冲区二的内容）
+2.显示缓冲区一的内容
+3.将要输出的数据写在缓冲区二（写的过程中显示的是缓冲区一的内容）
+4.显示缓冲区二的内容 ，回到第1步*/
+
+/*博弈树：博弈树是指由于动态博弈参与者的行动有先后次序，因此可以依次将参与者的行动展开成一个树状图形。
+顾名思义，博弈树就对博弈双方以相同的次数轮流进行决策行为的图形描述。
+对于任何一种博弈竞赛，我们都可以将其构建成一颗博弈树，其节点对应某一种棋局，其分支表示进行一步决策，博弈树的根表示开始位置，叶子节点表示博弈到此结束。
+*/
+
+/*极大极小值搜索算法：有了博弈树的概念后，我们需要做的是对这棵巨大的博弈树进行搜索，由于博弈树的每一个分支都是一步决策，因此我们需要对其进行深度优先搜索，这里我们用的是极大极小值搜索算法。
+极大极小值搜索算法是一种在失败的可能性中找出最小值的方法，通俗的说就是最小化对手的最大利益，这种算法通常用递归实现。
+我们需要在双方走每一步棋后对棋局进行评估，得到一个分数，规定这个分数越大，对玩家越有利，反之对 AI 更有利。
+因此 ：AI 走的层我们成为MIN层，在这一层 AI 要选择分值最低的点走以保障自己的利益最大化；玩家走的层我们成为MAX层，在这一次玩家要选择分值最高的点走以保障自己的利益最大化；
+AI 在玩家落子后，遍历所有可走的位置，模拟玩家落子，并对每一种走法进行评估，选择对自己最有利的一步棋。那么，我们就需要一个能对当下局势做出评估的方法。
+*/
+
+/*评估函数：评估函数（也称评价函数）是博弈类游戏中 AI 的重要一部分，它决定了 AI 的决策步骤 ，主要任务是评估节点的重要程度。
+通俗的讲，评估函数为 AI 评估目前的对局形式，也为 AI 模拟每一步决策后的对局形式，并决策出于 AI 最有利、于对方最不利的一步。
+公式：G(s) = a1 * f1(s) + a2 * f2(s) + a3 * f3(s) + . . . + an * f(n)
+其中 s 为当前的局面，fi(s) 为某个评估因素的得分， ai 为某个评估因素的权重比。
+五子棋对弈的过程中，一定会出现以下这些情况：
+五子：这种情况表示已经有一方赢得了本次对弈，出现这种情况时，我们给当前局势的评分为无穷大(infinity)
+双四：一方出现了两个四子相连，且均为被堵死，这种情况被认为极有可能获胜，设评分为 10000
+单四：一方出现了一个四子相连，且未被堵死，这种情况被认为有较大可能获胜，设评分为 5000
+双三：一方出现了两个三子相连，且均为被堵死，这种情况被认为有较大优势，设评分为 2000
+单三：一方出现了一个三子相连，且未被堵死，这种情况被认为有优势，设评分为 1000
+双二 ：一方出现了两个二子相连，且均未被堵死，这种情况我们设评分为 500
+单二 ：一方出现了一个二子相连，且未被堵死，设评分为 200
+一子 ：只有一子，设评分为 10
+上面这些就是我评估因素的权重比(ai)。但是仅有这些权重比是不够的，还需要fi()，也就是一个能根据当前局面给出得分的方法。
+设计fi()：我们需要引入一个新的概念，赢法数组。存储获胜条件的结构为：赢法数组。
+首先，我们需要把五子棋的所有赢法存入该数组，在15 x 15的棋盘中一共有 572 种赢法。
+有了所有的赢法之后，我们就可以给出得分了：
+对于每一种种赢法，我们需要统计该赢法的位置上己方棋子和对方棋子的数目，同样可以存储在一个数组中，然后在每一次需要对当前局势评估时，
+如果某种赢法上只有己方棋子或只有对方棋子，根据棋子的的数目就是该点的权重，也就是fi()得出的值，在和预设的评分 ai 相乘，将总分相加，就得出了当前局势下某一方的评估分数。
+通过这样的方法，我们可以得到两个数字，分别是 玩家 和 AI 的当前优势值，我们将这两个数字做差，返回MAX - MIN的值，这就是该种走法的分数，也就是博弈树种叶子节点的值，值越大对玩家更有利，值越小对AI更有利。
+*/
+
+/*剪枝算法：剪去没有意义的分支来降低搜索次数，提高搜索速度，这里用的Alpha-Beta剪枝算法。
+Alpha-Beta剪枝算法是在极大极小值搜索算法上的一种改进，是一种对抗性搜索算法，当算法评估出某策略的后续走法比之前的策略还差时，就会停止该策略的后续搜索，相当于剪去了不影响最终决定的分枝。
+算法将会用到两个值：alpha和beta，分别代表玩家能够接受的最低分和AI能够接受的最高分，
+一旦出现beta <= alpha ，我们认为父节点不会选择这个节点，因为选择这个节点会为自己带来不利，因此该分枝的其他节点也就没有了搜索的必要。
+*/
+
+
+//头文件
+#include "stdio.h"//调用printf函数，scanf函数等
+#include "math.h"//调用一些数学运算函数
+#include "windows.h"//调用COORD,sleep函数等
+#include"conio.h"//调用getch等函数
+#include "time.h"//使用当前时钟做种子，调用srand函数等
+
+
+//定义标识符
+#define N 15       //定义棋盘大小  1黑2白
+#define M N+8      //定义数据棋盘大小
+#define _CRT_SECURE_NO_WARNINGS//不显示错误c4996
+
+
+//定义
+int jieguo;//结果，用于显示游戏对局结果
+int  chess[N][N];//棋盘，用于储存下子位置
+int  count[M][M];//数据棋盘，用于储存下子位置，和盘外数据
+char buffer[N * 2 - 1][N * 4 - 3];//缓冲器，用于储存下子位置，盘外数据，和棋盘符号
+long sum[M][M] = { {0} };//得分棋盘，储存得分情况
+int  p[20][5];//存储该位置的所有可能的五连珠情况
+int  player = 1, ai = 2, error = -1;//定义玩家与ai
+int  num;//双方回合总数
+int  now;//设置下棋标志
+int  flag0;//确定己方已下子
+int  gs;//游戏结束标志
+int c0;//记录游戏局数
+int  w0;//记录白子胜场
+int b0;//记录黑子胜场
+
+
+//基础函数
+void RunGame();//进行整个对局
+int  Menu();//设置开始菜单
+void Initialize();//初始化棋盘，数据棋盘，和缓冲器
+void Print(int x, int y);//将数据写入数据棋盘，和缓冲器
+void Display();//将缓冲器数据输出到屏幕
+void Buf_Display();//利用双缓冲将缓冲器数据输出到屏幕
+int  Judge_Display();//输出胜负情况
+
+//双方对局函数
+void PGame();//玩家对局函数
+void CGame();//电脑对局函数
+
+//输入函数
+void Input(int *x, int *y);//键盘方向键控制，空格键输入
+void Mark(int x0, int y0, int x, int y);//标记下子位置
+
+//电脑判断函数
+int  Basic_condition(int x, int y);//判断下子位置是否出界
+void Find_point(int *pp, int *qq);//找到最佳性最优的下子位置
+int  JUDGE(int x, int y);//判断胜负
+void Grade();//计算所有位置的得分
+int  Base(int i, int j);//坐标为(i-4,j-4)的所有五连珠情况
+long Assessment(int num1, int num2);//评分标准
+int MFILE();//平局记录文件
+int WFILE();//白子胜记录文件
+int BFILE();//黑子胜记录文件
+void _return();//返回主菜单
+int pk();//记录胜率
+
+
+//主程序
+int main()
+{
+	//设置
+	system("title 简易五子棋");//设置标题
+	system("mode con cols=58 lines=29");//设置窗口大小
+	system("color E0");//设置颜色
+	
+	//调用函数
+	Initialize();//初始化棋盘，数据棋盘，和缓冲器
+	RunGame();//进行整个对局*/
+	MFILE();//在指定文件记录平局记录
+	WFILE();//在指定文件记录白子胜利记录
+	BFILE();//在指定文件记录黑子胜利记录
+
+	return 0;
+}
+
+
+//函数定义
+void RunGame()//进行整个对局
+{
+	switch (Menu())
+	{
+	case 1:
+		while (1)
+		{
+			PGame();//玩家对局函数
+			if (Judge_Display())
+			{
+				break;//对局结束
+			}
+			CGame();//电脑对局函数
+			if (Judge_Display())
+			{
+				break;//对局结束
+			}
+		}
+		printf("按0返回主菜单，按其他键结束");
+		//while
+		break;
+	case 2:
+		now = ai;
+		count[N / 2 + 4][N / 2 + 4] = now; chess[N / 2][N / 2] = now;
+		Print(N / 2, N / 2);//将数据写入数据棋盘，和缓冲器
+		num++;
+		while (1)
+		{
+			PGame();//玩家对局函数
+			if (Judge_Display())//玩家对局函数
+			{
+				break;//对局结束
+			}
+			CGame();//电脑对局函数
+			if (Judge_Display())
+			{
+				break;//对局结束
+			}
+		}//while
+		break;
+	case 3:
+		now = 1;
+		count[N / 2 + 4][N / 2 + 4] = now; chess[N / 2][N / 2] = now;
+		Print(N / 2, N / 2);//将数据写入数据棋盘，和缓冲器
+		num++;
+		while (1)
+		{
+			CGame();//电脑对局函数
+			if (Judge_Display())
+			{
+				break;//对局结束
+			}
+		}	
+		break;
+	case 4:pk(); break;
+	default:;
+	}
+}//完成了游戏对局的进行步骤。
+//根据玩家选择的开局方式，进行相应的程序运行顺序。
+//通过变量now表示当前下子，如果玩家选择1（即玩家先手），则由玩家对局函数(PGAME)开始运行，并在每次落子后判断该子落下后，落下该子的对象是否达到了Judge Display（判断游戏是否结束）中的条件。
+//若未达到，则由另一对象作为now落子，无限循环，直到有一方达到条件。
+//若达到Judge Display中的条件，则跳出循环。
+
+
+int Menu()//设置开始菜单
+{
+	int x;
+	printf("1、玩家先手\n");
+	printf("2、玩家后手\n");
+	printf("3、电脑自对弈\n");
+	printf("4、查看对局记录\n");
+	scanf_s("%d", &x);//得到玩家选择的数字
+	return x;//返回x的值
+}//菜单函数，并返回一个值X，用于表示玩家选择的开局方式。
+
+void Initialize()//初始化棋盘，数据棋盘，和缓冲器
+{
+	int i, j;
+	//初始化数据棋盘
+	for (i = 0; i < M; i++)
+	{
+		for (j = 0; j < M; j++)
+		{
+			if ((i < 4 || i >= M - 4) && (j < 4 || j >= M - 4))
+			{
+				count[i][j] = error;
+			}
+		}
+	}
+	//初始化缓冲器
+	for (i = 0; i < N * 2 - 1; i++)
+	{
+		for (j = 0; j < N * 4 - 3; j++)
+		{
+			if (i == 0 && j == 0)//以下为边缘棋盘样式
+				buffer[i][j] = 'a';//"┏";
+			else if (i == 0 && j == (N * 4 - 3) - 1)
+				buffer[i][j] = 'b';//"┓";
+			else if (i == (N * 2 - 1) - 1 && j == (N * 4 - 3) - 1)
+				buffer[i][j] = 'c';//"┛";
+			else if (i == (N * 2 - 1) - 1 && j == 0)
+				buffer[i][j] = 'd';//"┗";
+			else if (i == 0 && j % 4 == 0)
+				buffer[i][j] = 'e';//"┯";
+			else if (i == (N * 2 - 1) - 1 && j % 4 == 0)
+				buffer[i][j] = 'f';//"┷";
+			else if (i % 2 == 0 && j == 0)
+				buffer[i][j] = 'g';//"┠";
+			else if (i % 2 == 0 && j == (N * 4 - 3) - 1)
+				buffer[i][j] = 'h';//"┨";
+			else if ((i == 0 || i == (N * 2 - 1) - 1) && (j / 2) % 2 != 0)
+				buffer[i][j] = 'i';//"━";
+			else if (i != 0 && i != (N * 2 - 1) - 1 && i % 2 == 0 && (j / 2) % 2 != 0)
+				buffer[i][j] = 'j';//"—";
+			else if (i % 2 != 0 && (j == 0 || j == (N * 4 - 3) - 1))
+				buffer[i][j] = 'k';//"┃";
+			else if (i % 2 != 0 && j != 0 && j != (N * 4 - 3) - 1 && j % 4 == 0)
+				buffer[i][j] = 'l';//"│";
+			else if (i != 0 && j != 0 && i != (N * 2 - 1) - 1 && j != (N * 4 - 3) - 1 && i % 2 == 0 && j % 4 == 0)
+				buffer[i][j] = 'm';//中间的空位"┼"
+		}
+	}
+}//将棋盘，缓冲器，数据棋盘初始化，并通过a b c d ….将棋盘中每行每列的横线竖线分类表示，准备写入数据棋盘。
+
+
+void Print(int x, int y)//将数据写入数据棋盘，和缓冲器
+{
+	count[x + 4][y + 4] = chess[x][y];
+	buffer[x * 2][y * 4] = chess[x][y] + 48;//将整型数据转化为字符型数据
+}
+
+void Display()//将缓冲器数据输出到屏幕
+{
+	int i, j;//定义循环数
+	system("cls");//清理屏幕，准备写入
+	for (i = 0; i < N * 2 - 1; i++)
+	{
+		for (j = 0; j < N * 4 - 3; j++)
+		{
+			//printf("%c", buffer[i][j]);
+			switch (buffer[i][j])
+			{
+			case '1': printf("●"); j++; break;//j++不可省
+			case '2': printf("○"); j++; break;//j++不可省
+			case 'a': printf("┏"); break;
+			case 'b': printf("┓"); break;
+			case 'c': printf("┛"); break;
+			case 'd': printf("┗"); break;
+			case 'e': printf("┯"); break;
+			case 'f': printf("┷"); break;
+			case 'g': printf("┠"); break;
+			case 'h': printf("┨"); break;
+			case 'i': printf("━"); break;//上下的横线更粗
+			case 'j': printf("—"); j++; break;//中间的横线更细//j++;由于输出"—"时占两个字符，j++可以避开输出下一个的空格
+			case 'k': printf("┃"); break;//左右的竖线更粗
+			case 'l': printf("│"); break;//中间的竖线更粗
+			case 'm': printf("┼"); break;
+			case ' ': printf(" "); break;
+			default: printf("%c", buffer[i][j]);
+			}//switch部分
+		}//for内循环部分
+		printf("\n");
+	}//for外循环部分
+	Sleep(100);
+}//通过switch case语句将前面分好类的字符逐行送入打印缓冲区1，形成棋盘
+
+void PGame()//玩家对局函数
+{
+	static int Px0 = N / 2, Py0 = N / 2, Px = N / 2, Py = N / 2;//定义静态的int型变量
+	now = 1;
+	do {
+		Mark(Px0, Py0, Px, Py);//标记下子位置
+		Buf_Display();//将缓冲器数据输出到屏幕
+		Px0 = Px; Py0 = Py;
+		Input(&Px, &Py);
+	} while (!(chess[Px][Py] && flag0 == 1));
+	Print(Px, Py);//将数据写入数据棋盘，和缓冲器
+	num++;
+	gs = JUDGE(Px + 4, Py + 4);//判断胜负情况
+}
+
+void CGame()//电脑对局函数
+{
+	static int Cp = N / 2, Cq = N / 2, Cp0, Cq0;//定义静态的int型变量
+	Buf_Display();//将缓冲器数据输出到屏幕
+	Grade();//计算所有位置的得分
+	Cp0 = Cp; Cq0 = Cq;//记录上一次电脑下子位置
+	Find_point(&Cp, &Cq);//找到最佳性最优的下子位置
+	now = 3 - now;
+	chess[Cp - 4][Cq - 4] = now;
+	Mark(Cp0 - 4, Cq0 - 4, Cp - 4, Cq - 4);//标记下子位置
+	Print(Cp - 4, Cq - 4);//将数据写入数据棋盘，和缓冲器
+	num++;
+	gs = JUDGE(Cp, Cq);//判断胜负情况
+}
+
+void Input(int *x, int *y)//通过键盘方向键控制，按下空格键进行落子
+{
+	int input;
+	flag0 = 0;
+	input = _getch();//获得第一次输入信息
+	if (input == 0x20 && !chess[*x][*y])//判断移动光标后，玩家是否下子
+	{
+		chess[*x][*y] = player;
+		flag0 = 1;
+	}
+	else if (input == 0xE0)//如果按下的是方向键，会填充两次输入，第一次为0xE0表示按下的是控制键
+	{
+		input = _getch();//获得第二次输入信息
+		switch (input)//判断方向键方向并移动光标位置
+		{
+		case 0x48: (*x)--; break;
+		case 0x4B: (*y)--; break;
+		case 0x50: (*x)++; break;
+		case 0x4D: (*y)++; break;
+		}//switch
+		if (*x < 0)   (*x) = N - 1;//如果光标位置越界则移动到对侧
+		if (*y < 0)   (*y) = N - 1;
+		if (*x > N - 1) (*x) = 0;
+		if (*y > N - 1) (*y) = 0;
+	}
+}
+
+void Mark(int x0, int y0, int x, int y)//标记己方下子位置
+{
+	x0 = x0 * 2; y0 = y0 * 4;
+	buffer[x0 - 1][y0 - 2] = ' ';
+	buffer[x0 - 1][y0 + 2] = ' ';
+	buffer[x0 + 1][y0 + 2] = ' ';
+	buffer[x0 + 1][y0 - 2] = ' ';
+	x = x * 2; y = y * 4;
+	buffer[x - 1][y - 2] = 'a';
+	buffer[x - 1][y + 2] = 'b';
+	buffer[x + 1][y + 2] = 'c';
+	buffer[x + 1][y - 2] = 'd';
+	if (y == (N * 4 - 3) - 1)//解决“当光标移动到最右侧时，光标发生错位”
+	{
+		buffer[x - 1][y + 2] = ' ';
+		buffer[x + 1][y + 2] = ' ';
+	}
+}
+
+int Basic_condition(int x, int y)//判断下子位置是否出界
+{
+	if (x >= 4 && x < M - 4 && y >= 4 && y < M - 4)
+	{
+		return 1;//返回值1用于判断
+	}
+	else
+	{
+		return 0;//返回值0用于判断
+	}
+}
+
+void Find_point(int *pp, int *qq)//找到最佳性最优的下子位置
+{
+	int i, j, flag = 0;//flag为结束标志
+	long t = 0;
+	int r, c = 0, sumed[N*N][2];
+	//寻找第一个未下子位置对应的sum值
+	for (i = 4; i < M - 4 && flag == 0; i++)
+	{
+		for (j = 4; j < M - 4 && flag == 0; j++)
+		{
+			if (!chess[i - 4][j - 4])
+			{
+				t = sum[i][j];
+				flag = 1;
+			}
+		}
+	}//for
+	//寻找最大的sum值
+	for (i = 4; i < M - 4; i++)
+	{
+		for (j = 4; j < M - 4; j++)
+		{
+			if (!chess[i - 4][j - 4] && sum[i][j] > t)
+			{
+				t = sum[i][j];
+			}
+		}
+	}//for
+	//等于怎么办
+	//存储所有的最大sum值
+	for (i = 4; i < M - 4; i++)
+	{
+		for (j = 4; j < M - 4; j++)
+		{
+			if (!chess[i - 4][j - 4] && sum[i][j] == t)
+			{
+				sumed[c][0] = i;
+				sumed[c][1] = j;
+				c++;
+			}
+		}
+	}//for
+	srand((unsigned)time(NULL)); //初始化随机数
+	//随机选用最大sum值中的一组数据
+	r = rand() % c;
+	*pp = sumed[r][0];
+	*qq = sumed[r][1];
+}
+
+int JUDGE(int x, int y)//判断胜负，返回1赢，返回0无
+{
+	int a = 1, b = 1, c = 1, d = 1, i;//累计横竖正斜反斜四个方向的连续相同棋子数目
+	for (i = 1; i < 5; i++)if (y + i < M - 4 && count[x][y + i] == now)a++; else break;//向下检查
+	for (i = 1; i < 5; i++)if (y - i >= 4 && count[x][y - i] == now)a++; else break;//向上检查
+	if (a >= 5)return now;//若达到5个则判断当前走子玩家为赢家
+	for (i = 1; i < 5; i++)if (x + i < M - 4 && count[x + i][y] == now)b++; else break;//向右检查
+	for (i = 1; i < 5; i++)if (x - i >= 4 && count[x - i][y] == now)b++; else break;//向左检查
+	if (b >= 5)return now;//若达到5个则判断当前走子玩家为赢家
+	for (i = 1; i < 5; i++)if (x + i < M - 4 && y + i < M - 4 && count[x + i][y + i] == now)c++; else break;//向右下检查
+	for (i = 1; i < 5; i++)if (x - i >= 4 && y - i >= 4 && count[x - i][y - i] == now)c++; else break;//向左上检查
+	if (c >= 5)return now;//若达到5个则判断当前走子玩家为赢家
+	for (i = 1; i < 5; i++)if (x + i < M - 4 && y - i >= 4 && count[x + i][y - i] == now)d++; else break;//向右上检查
+	for (i = 1; i < 5; i++)if (x - i >= 4 && y + i < M - 4 && count[x - i][y + i] == now)d++; else break;//向左下检查
+	if (d >= 5)return now;//若达到5个则判断当前走子玩家为赢家
+	return 0;//若没有检查到五连珠，则返回0表示还没有玩家达成胜利
+}
+
+void Grade()//计算所有位置的得分
+{
+	int i, j, m, n;
+	int num1, num2;
+	for (i = 4; i < M - 4; i++)
+	{
+		for (j = 4; j < M - 4; j++)
+		{
+			if (!chess[i - 4][j - 4])
+			{
+				sum[i][j] = 0;//循环初始化sum[i][j]
+				Base(i, j);//坐标为(i-4,j-4)的所有五连珠情况
+				for (m = 0; m < 20; m++)
+				{
+					num1 = 0; num2 = 0;
+					for (n = 0; n < 5; n++)
+					{
+						if (p[m][n] == now)
+							num1++;
+						else if (p[m][n] == 3 - now)
+							num2++;
+						else if (p[m][n] == error)
+						{
+							num1 = error; num2 = error;
+							break;
+						}
+					}
+					sum[i][j] += Assessment(num1, num2);
+				}
+			}
+		}
+	}
+}
+
+int Base(int i, int j)//坐标为(i-4,j-4)的所有五连珠情况
+{
+	//左上->右下
+	p[0][0] = count[i - 4][j - 4]; p[0][1] = count[i - 3][j - 3]; p[0][2] = count[i - 2][j - 2]; p[0][3] = count[i - 1][j - 1]; p[0][4] = count[i][j];
+	p[1][0] = count[i - 3][j - 3]; p[1][1] = count[i - 2][j - 2]; p[1][2] = count[i - 1][j - 1]; p[1][3] = count[i][j]; p[1][4] = count[i + 1][j + 1];
+	p[2][0] = count[i - 2][j - 2]; p[2][1] = count[i - 1][j - 1]; p[2][2] = count[i][j]; p[2][3] = count[i + 1][j + 1]; p[2][4] = count[i + 2][j + 2];
+	p[3][0] = count[i - 1][j - 1]; p[3][1] = count[i][j]; p[3][2] = count[i + 1][j + 1]; p[3][3] = count[i + 2][j + 2]; p[3][4] = count[i + 3][j + 3];
+	p[4][0] = count[i][j]; p[4][1] = count[i + 1][j + 1]; p[4][2] = count[i + 2][j + 2]; p[4][3] = count[i + 3][j + 3]; p[4][4] = count[i + 4][j + 4];
+	//上->下
+	p[5][0] = count[i - 4][j]; p[5][1] = count[i - 3][j]; p[5][2] = count[i - 2][j]; p[5][3] = count[i - 1][j]; p[5][4] = count[i][j];
+	p[6][0] = count[i - 3][j]; p[6][1] = count[i - 2][j]; p[6][2] = count[i - 1][j]; p[6][3] = count[i][j]; p[6][4] = count[i + 1][j];
+	p[7][0] = count[i - 2][j]; p[7][1] = count[i - 1][j]; p[7][2] = count[i][j]; p[7][3] = count[i + 1][j]; p[7][4] = count[i + 2][j];
+	p[8][0] = count[i - 1][j]; p[8][1] = count[i][j]; p[8][2] = count[i + 1][j]; p[8][3] = count[i + 2][j]; p[8][4] = count[i + 3][j];
+	p[9][0] = count[i][j]; p[9][1] = count[i + 1][j]; p[9][2] = count[i + 2][j]; p[9][3] = count[i + 3][j]; p[9][4] = count[i + 4][j];
+	//右上->左下
+	p[10][0] = count[i - 4][j + 4]; p[10][1] = count[i - 3][j + 3]; p[10][2] = count[i - 2][j + 2]; p[10][3] = count[i - 1][j + 1]; p[10][4] = count[i][j];
+	p[11][0] = count[i - 3][j + 3]; p[11][1] = count[i - 2][j + 2]; p[11][2] = count[i - 1][j + 1]; p[11][3] = count[i][j]; p[11][4] = count[i + 1][j - 1];
+	p[12][0] = count[i - 2][j + 2]; p[12][1] = count[i - 1][j + 1]; p[12][2] = count[i][j]; p[12][3] = count[i + 1][j - 1]; p[112][4] = count[i + 2][j - 2];
+	p[13][0] = count[i - 1][j + 1]; p[13][1] = count[i][j]; p[13][2] = count[i + 1][j - 1]; p[13][3] = count[i + 2][j - 2]; p[13][4] = count[i + 3][j - 3];
+	p[14][0] = count[i][j]; p[14][1] = count[i + 1][j - 1]; p[14][2] = count[i + 2][j - 2]; p[14][3] = count[i + 3][j - 3]; p[14][4] = count[i + 4][j - 4];
+	//左->右
+	p[15][0] = count[i][j - 4]; p[15][1] = count[i][j - 3]; p[15][2] = count[i][j - 2]; p[15][3] = count[i][j - 1]; p[15][4] = count[i][j];
+	p[16][0] = count[i][j - 3]; p[16][1] = count[i][j - 2]; p[16][2] = count[i][j - 1]; p[16][3] = count[i][j]; p[16][4] = count[i][j + 1];
+	p[17][0] = count[i][j - 2]; p[17][1] = count[i][j - 1]; p[17][2] = count[i][j]; p[17][3] = count[i][j + 1]; p[17][4] = count[i][j + 2];
+	p[18][0] = count[i][j - 1]; p[18][1] = count[i][j]; p[18][2] = count[i][j + 1]; p[18][3] = count[i][j + 2]; p[18][4] = count[i][j + 3];
+	p[19][0] = count[i][j]; p[19][1] = count[i][j + 1]; p[19][2] = count[i][j + 2]; p[19][3] = count[i][j + 3]; p[19][4] = count[i][j + 4];
+	return 0;
+}
+
+
+long Assessment(int num1, int num2)//评分标准
+{
+	if (num2 == 0)//判断电脑五元组得分
+	{
+		switch (num1)
+		{
+		case 0: return 7;
+		case 1: return 35;
+		case 2: return 800;
+		case 3: return 15000;
+		case 4: return 800000;
+		}
+	}
+	if (num2 != 0 && num1 == 0)//判断玩家五元组得分
+	{
+		switch (num2)
+		{
+		case 1: return 15;
+		case 2: return 400;
+		case 3: return 1800;
+		case 4: return 100000;
+		}
+	}
+	return 0;
+}
+
+void Buf_Display()//利用双缓冲将缓冲器数据输出到屏幕
+{
+	int i, j;
+	//创建屏幕缓冲区
+	HANDLE hNewConsole = CreateConsoleScreenBuffer(GENERIC_WRITE | GENERIC_READ,
+		0,
+		NULL,
+		CONSOLE_TEXTMODE_BUFFER,
+		NULL);
+	//隐藏光标
+	CONSOLE_CURSOR_INFO cci = { 1, 0 };
+	SetConsoleCursorInfo(hNewConsole, &cci);
+	//设置窗口的缓冲区大小
+	COORD cdBufferSize = { 58, 29 };
+	SetConsoleScreenBufferSize(hNewConsole, cdBufferSize);
+	//然后我们输出这个数组看看
+	for (i = 0; i < N * 2 - 1; i++)
+	{
+		for (j = 0; j < N * 4 - 3; j++)
+		{
+			COORD cdCursorPos = { j, i };
+			char *p = NULL;
+			//          printf("%c", buffer[i][j]);
+			switch (buffer[i][j])
+			{
+			case '1': p = "●"; j++; break;//j++可省
+			case '2': p = "○"; j++; break;//j++可省
+			case 'a': p = "┏"; break;
+			case 'b': p = "┓"; break;
+			case 'c': p = "┛"; break;
+			case 'd': p = "┗"; break;
+			case 'e': p = "┯"; break;
+			case 'f': p = "┷"; break;
+			case 'g': p = "┠"; break;
+			case 'h': p = "┨"; break;
+			case 'i': p = "━"; break;//上下的横线更粗
+			case 'j': p = "—"; j++; break;//中间的横线更细//j++;由于输出"—"时占两个字符，j++可以避开输出下一个的空格
+			case 'k': p = "┃"; break;//左右的竖线更粗
+			case 'l': p = "│"; break;//中间的竖线更粗
+			case 'm': p = "┼"; break;
+			case ' ': p = " "; break;
+			default: p = &buffer[i][j];
+			}//switch,for
+			if (!p) continue;
+			SetConsoleCursorPosition(hNewConsole, cdCursorPos);
+			WriteConsole(hNewConsole, p, strlen(p), NULL, NULL);
+		}
+	}//for
+	//把绘制好的东西都显示出来
+	SetConsoleActiveScreenBuffer(hNewConsole);
+	//如果游戏结束，返回正常模式
+}//	通过switch case语句将前面分好类的字符逐行送入打印缓冲区2，形成棋盘。
+//通过 SetConsoleActiveScreenBuffer(hNewConsole); 将缓冲区内容输出到控制台。
+
+int  Judge_Display()//输出胜负情况
+{
+	if (num == N * N)
+	{
+		Buf_Display();//将缓冲器数据输出到屏幕
+		printf("平局！\n");
+		jieguo = 1;
+		return 1;//对局结束
+	}
+	if (gs == 1)
+	{
+		Buf_Display();//将缓冲器数据输出到屏幕
+		printf("黑棋赢！\n");
+		jieguo = 2;
+		return 2;//对局结束
+	}
+	if (gs == 2)
+	{
+		Buf_Display();//将缓冲器数据输出到屏幕
+		printf("白棋赢！\n");
+		jieguo = 3;
+		return 3;//对局结束
+	}
+	return 0;
+}//输出胜负情况。将胜负及平局的条件列出。在前面的RUNGAME函数中便是以本函数中所列出的3种情况进行判断。
+
+int MFILE()//平局记录文件
+{
+	FILE *fp; fp = fopen("D:\\1.txt", "a+");
+	if (jieguo == 1)
+	{
+		c0 = 1;
+		fprintf(fp, "%d", c0);
+	}
+	fclose(fp);
+	return 0;
+}//如果结果等于1则判断平局，并将结果储存。
+
+int WFILE()//白子胜记录文件
+{
+	FILE *fp; fp = fopen("D:\\w.txt", "a+");
+	if (jieguo == 3)
+	{
+		w0 = 1;
+		fprintf(fp, "%d", w0);
+	}
+	fclose(fp);
+	return 0;
+}//如果结果等于3则判断白棋胜利，并将结果储存。
+
+int BFILE()//黑子胜记录文件
+{
+	FILE *fp; fp = fopen("D:\\b.txt", "a+");
+	if (jieguo == 2)
+	{
+		b0 = 1;
+		fprintf(fp, "%d", b0);
+	}fclose(fp);
+	return 0;
+}// 如果结果等于2则判断黑棋胜利，并将结果储存。
+
+int pk()//记录胜率
+{
+	system("cls");
+	FILE *fp; fp = fopen("D:\\1.txt", "r");
+	FILE *w;  w = fopen("D:\\w.txt", "r");
+	FILE *b; b = fopen("D:\\b.txt", "r");
+	char ch;
+	int mm = 0, ww = 0, bw = 0;
+	while ((ch = fgetc(fp)) != EOF)
+	{
+		if (ch >= '0'&&ch <= '9')
+			mm++;
+	}
+	printf("平局了%d场\n", mm);//计算平局场次
+	while ((ch = fgetc(w)) != EOF)
+	{
+		if (ch >= '0'&&ch <= '9')
+			ww++;
+	}
+	printf("白子胜利%d场\n", ww);//计算白子胜利场次
+	while ((ch = fgetc(b)) != EOF)
+	{
+		if (ch >= '0'&&ch <= '9')
+			bw++;
+	}
+	printf("黑子胜利%d场\n", bw);//计算黑子胜利场次
+	_return();
+	fclose(fp);
+	fclose(w);
+	fclose(b);
+	return 0;
+}//本程序通过文件存储对局的结果记录。
+//由于文件中不能执行指定行插入，所以采用了3个文件分别存储平局，白子胜，黑子胜3种结果。
+//jieguo==1为jugge函数判断平局时，将1赋给jieguo变量。
+//当平局时，便向指定文件中写入1个C0=1作为记录。
+//然后读取文件中记录的字符个数，便是相应结果的产生次数。
+
+void _return ()//返回主菜单
+{
+	printf("按0返回主菜单，按其他任意键退出\n");
+	int t;
+	scanf_s("%d", &t);
+	system("cls");//清屏
+	switch (t)
+	{
+	case 0:RunGame(); break;//返回到主菜单
+	default:;
+	}
+}//通过输入0来返回主菜单
